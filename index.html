@@ -1,0 +1,309 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f2c230"><link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tape Log">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Saturday Tape Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: a tape-measure strip header, then the latest week as a ledger of sites with deltas and sparklines, then the entry form and history. */
+:root{
+  --bg:#f6f5f0; --surface:#ffffff; --fg:#1d1f1c; --muted:#6b6e66; --line:#dcdad0;
+  --tape:#f2c230; --tape-ink:#2a2306; --down:#2f7d5b; --up:#b5532f; --flat:#7a7d74;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"Source Sans 3",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151613; --surface:#1e201c; --fg:#ecebe4; --muted:#9a9c93; --line:#33352f;
+  --tape:#e8b923; --tape-ink:#1d1803; --down:#5cc497; --up:#f08a62; --flat:#9a9c93; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151613; --surface:#1e201c; --fg:#ecebe4; --muted:#9a9c93; --line:#33352f;
+  --tape:#e8b923; --tape-ink:#1d1803; --down:#5cc497; --up:#f08a62; --flat:#9a9c93; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.tape{margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) ;background:var(--tape);color:var(--tape-ink);
+  padding-block:14px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tape-in{max-width:640px;margin:0 auto}
+.tape h1{font-family:var(--display);font-weight:700;font-size:2rem;line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+.tape p{margin:4px 0 10px;font-size:.92rem}
+.ticks{height:18px;background:
+  repeating-linear-gradient(90deg,var(--tape-ink) 0 1.5px,transparent 1.5px 40px) bottom/100% 18px no-repeat,
+  repeating-linear-gradient(90deg,var(--tape-ink) 0 1px,transparent 1px 20px) bottom/100% 11px no-repeat,
+  repeating-linear-gradient(90deg,var(--tape-ink) 0 1px,transparent 1px 4px) bottom/100% 5px no-repeat;opacity:.75}
+h2{font-family:var(--display);font-weight:700;font-size:1.35rem;margin:0 0 10px;letter-spacing:.02em}
+.eyebrow{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.status{font-size:.9rem;color:var(--muted)}
+.headline{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.stat b{display:block;font-family:var(--mono);font-weight:500;font-size:1.3rem;font-variant-numeric:tabular-nums}
+.stat small{font-family:var(--mono);font-size:.8rem}
+.ledger{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.ledger th{font-weight:600;text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:6px 4px;border-bottom:2px solid var(--fg)}
+.ledger td{padding:9px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ledger td.n{font-family:var(--mono);text-align:right;white-space:nowrap}
+.ledger th.n{text-align:right}
+.site{font-weight:600}
+.site span{display:block;font-weight:400;font-size:.78rem;color:var(--muted)}
+.d-down{color:var(--down)} .d-up{color:var(--up)} .d-flat{color:var(--flat)}
+.spark{width:64px;height:24px;display:block}
+.tablebox{overflow-x:auto}
+form{display:flex;flex-direction:column;gap:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600;min-width:0}
+label em{font-style:normal;font-weight:400;color:var(--muted);font-size:.75rem}
+input{font:inherit;font-family:var(--mono);font-size:1rem;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);width:100%;min-width:0}
+input:focus-visible,button:focus-visible{outline:2px solid var(--tape);outline-offset:2px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-weight:600;padding:10px 16px;border-radius:6px;border:1px solid var(--fg);background:transparent;color:var(--fg);cursor:pointer}
+button.primary{background:var(--tape);color:var(--tape-ink);border-color:var(--tape)}
+button.danger{border-color:var(--up);color:var(--up)}
+.tip{font-size:.85rem;color:var(--muted);margin:0}
+.hist{list-style:none;padding:0;margin:0;display:flex;flex-direction:column}
+.hist li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center}
+.hist .meta{font-family:var(--mono);font-size:.85rem;color:var(--muted)}
+.hist button{padding:6px 12px;font-size:.85rem}
+.msg{font-size:.9rem;min-height:1.2em}
+@media (max-width:420px){.headline{grid-template-columns:1fr 1fr}.headline .stat:last-child{grid-column:span 2}.spark{width:48px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head><body>
+<header class="tape"><div class="tape-in">
+  <h1>Saturday Tape Log</h1>
+  <p>Weekly measurements in cm. Target: about 15% body fat by April 2027.</p>
+  <div class="ticks" aria-hidden="true"></div>
+</div></header>
+
+<main class="wrap" style="margin-top:22px">
+  <p class="status" id="status">No weeks logged yet. Add your first measurements below.</p>
+
+  <section id="summary" hidden>
+    <div class="eyebrow" id="latestLabel"></div>
+    <div class="headline" id="headline" style="margin-top:8px"></div>
+  </section>
+
+  <section id="bfSec" hidden>
+    <h2>Body fat trend</h2>
+    <div id="bfChart"></div>
+    <p class="tip" id="bfNote" style="margin-top:8px"></p>
+  </section>
+
+  <section id="ledgerSec" hidden>
+    <h2>Every site</h2>
+    <div class="tablebox">
+      <table class="ledger">
+        <thead><tr><th>Site</th><th class="n">Now</th><th class="n">1 wk</th><th class="n">4 wk</th><th>Trend</th></tr></thead>
+        <tbody id="ledger"></tbody>
+      </table>
+    </div>
+    <p class="tip" style="margin-top:8px">Green means moving the way you want: waist, hips, neck, weight, body fat and fat mass down; arms and lean mass up. Other sites are shown neutral.</p>
+  </section>
+
+  <section>
+    <h2 id="formTitle">Log this week</h2>
+    <p class="tip" style="margin-bottom:12px">First thing, after the loo and before eating. Tape snug and level. Arms flexed, as usual.</p>
+    <form id="form" novalidate>
+      <label>Date<input type="date" id="f-date" required></label>
+      <div class="grid">
+        <label>Waist <em>navel, after exhale</em><input id="f-waist" inputmode="decimal"></label>
+        <label>Hips <em>widest</em><input id="f-hips" inputmode="decimal"></label>
+        <label>Chest <em>nipple line</em><input id="f-chest" inputmode="decimal"></label>
+        <label>Shoulders <em>widest of delts</em><input id="f-shoulders" inputmode="decimal"></label>
+        <label>Neck <em>below Adam's apple</em><input id="f-neck" inputmode="decimal"></label>
+        <label>Weight <em>kg, optional</em><input id="f-weight" inputmode="decimal"></label>
+      </div>
+      <div class="grid">
+        <label>Upper arm <em>L / R, flexed</em><span class="pair"><input id="f-armL" inputmode="decimal" aria-label="Left arm"><input id="f-armR" inputmode="decimal" aria-label="Right arm"></span></label>
+        <label>Thigh <em>L / R</em><span class="pair"><input id="f-thighL" inputmode="decimal" aria-label="Left thigh"><input id="f-thighR" inputmode="decimal" aria-label="Right thigh"></span></label>
+        <label>Calf <em>L / R</em><span class="pair"><input id="f-calfL" inputmode="decimal" aria-label="Left calf"><input id="f-calfR" inputmode="decimal" aria-label="Right calf"></span></label>
+      </div>
+      <div class="row">
+        <button class="primary" type="submit" id="saveBtn">Save week</button>
+        <button type="button" id="cancelBtn" hidden>Cancel edit</button>
+        <button type="button" class="danger" id="delBtn" hidden>Delete this week</button>
+      </div>
+      <div class="msg" id="msg" role="status"></div>
+    </form>
+  </section>
+
+  <section id="histSec" hidden>
+    <h2>History</h2>
+    <ul class="hist" id="hist"></ul>
+  </section>
+
+  <section>
+    <h2>Backup</h2>
+    <p class="tip" style="margin-bottom:10px">Your measurements stay on this phone only. Copy a backup link now and then, so you can restore them on a new phone.</p>
+    <button type="button" id="backupBtn">Copy backup link</button>
+    <p class="tip" id="backupMsg" style="margin-top:8px;word-break:break-all"></p>
+  </section>
+</main>
+
+<script>
+const SITES=[
+ {k:'waist',name:'Waist',goal:-1},{k:'hips',name:'Hips',goal:-1},{k:'chest',name:'Chest',goal:0},
+ {k:'shoulders',name:'Shoulders',goal:0},{k:'neck',name:'Neck',goal:-1},
+ {k:'armL',name:'Arm',side:'Left',goal:1},{k:'armR',name:'Arm',side:'Right',goal:1},
+ {k:'thighL',name:'Thigh',side:'Left',goal:0},{k:'thighR',name:'Thigh',side:'Right',goal:0},
+ {k:'calfL',name:'Calf',side:'Left',goal:0},{k:'calfR',name:'Calf',side:'Right',goal:0},
+ {k:'weight',name:'Weight',side:'kg',goal:-1},
+ {k:'bf',name:'Body fat',side:'% est.',goal:-1,derived:true},
+ {k:'fatKg',name:'Fat mass',side:'kg est.',goal:-1,derived:true},
+ {k:'leanKg',name:'Lean mass',side:'kg est.',goal:1,derived:true}
+];
+const KEYS=SITES.filter(s=>!s.derived).map(s=>s.k);
+const HEIGHT_CM=193, TARGET_BF=15;
+/* US Navy method (men): uses waist at navel, neck and height, all in cm. */
+function navyBF(waist,neck){if(waist==null||neck==null||waist<=neck)return null;
+  const v=495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(HEIGHT_CM))-450;return isFinite(v)?Math.round(v*10)/10:null}
+function enrich(w){const o={...w};o.bf=navyBF(num(w.waist),num(w.neck));
+  const wt=num(w.weight);if(o.bf!=null&&wt!=null){o.fatKg=Math.round(wt*o.bf/10)/10;o.leanKg=Math.round((wt-o.fatKg)*10)/10}return o}
+function bfChart(list){
+  const pts=list.map((w,i)=>({i,v:num(w.bf),d:w.date})).filter(p=>p.v!=null);
+  if(!pts.length)return '<p class="tip">Log waist and neck to see your body fat estimate.</p>';
+  const W=600,H=220,l=40,r=74,t=16,b=34,n=list.length;
+  const vs=pts.map(p=>p.v);let lo=Math.floor(Math.min(TARGET_BF,...vs)-1),hi=Math.ceil(Math.max(...vs)+1);
+  const x=i=>n<2?l+(W-l-r)/2:l+i*(W-l-r)/(n-1), y=v=>t+(hi-v)*(H-t-b)/(hi-lo);
+  const step=hi-lo>12?4:2;let g='';
+  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)g+=`<line x1="${l}" x2="${W-r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}%</text>`;
+  const ty=y(TARGET_BF);
+  g+=`<line x1="${l}" x2="${W-r}" y1="${ty}" y2="${ty}" stroke="var(--down)" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W-r+6}" y="${ty+4}" font-size="11" fill="var(--down)">15% goal</text>`;
+  const path=pts.map((p,k)=>(k?'L':'M')+x(p.i).toFixed(1)+' '+y(p.v).toFixed(1)).join(' ');
+  const area=pts.length>1?`<path d="${path} L${x(pts[pts.length-1].i).toFixed(1)} ${H-b} L${x(pts[0].i).toFixed(1)} ${H-b} Z" fill="var(--tape)" opacity=".18"/>`:'';
+  const last=pts[pts.length-1];
+  const dots=pts.map(p=>`<circle cx="${x(p.i)}" cy="${y(p.v)}" r="${p===last?4.5:3}" fill="${p===last?'var(--fg)':'var(--surface)'}" stroke="var(--fg)" stroke-width="1.5"/>`).join('');
+  const lab=`<text x="${x(last.i)+8}" y="${y(last.v)-8}" font-size="13" font-weight="600" fill="var(--fg)">${fmt(last.v)}%</text>`;
+  const every=Math.ceil(n/6);let xl='';
+  list.forEach((w,i)=>{if(i%every===0||i===n-1){const [yy,m,d]=w.date.split('-').map(Number);xl+=`<text x="${x(i)}" y="${H-12}" text-anchor="middle" font-size="11" fill="var(--muted)">${new Date(yy,m-1,d).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</text>`}});
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Estimated body fat by week, latest ${fmt(last.v)} percent" style="width:100%;height:auto;display:block;font-family:var(--mono)">${g}${area}<path d="${path}" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/>${dots}${lab}${xl}</svg>`;
+}
+const $=id=>document.getElementById(id);
+let weeks=[], db=null, editing=null, confirmDel=false;
+
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function fmtDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+function num(v){return typeof v==='number'&&isFinite(v)?v:null}
+function fmt(v){return v==null?'–':(Math.round(v*10)/10).toString()}
+function delta(a,b){return a==null||b==null?null:Math.round((a-b)*10)/10}
+function dCls(d,goal){if(d==null||d===0)return 'd-flat';if(!goal)return 'd-flat';return Math.sign(d)===goal?'d-down':'d-up'}
+function dTxt(d){return d==null?'–':(d>0?'+':d<0?'−':'±')+Math.abs(d)}
+
+function spark(vals){
+  const pts=vals.map((v,i)=>[i,v]).filter(p=>p[1]!=null);
+  if(pts.length<2)return '';
+  const w=64,h=24,p=3,xs=vals.length-1||1;
+  const ys=pts.map(p=>p[1]),mn=Math.min(...ys),mx=Math.max(...ys),rg=mx-mn||1;
+  const c=pts.map(([i,v])=>[p+(i/xs)*(w-2*p),h-p-((v-mn)/rg)*(h-2*p)]);
+  const d=c.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+  const e=c[c.length-1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${e[0].toFixed(1)}" cy="${e[1].toFixed(1)}" r="2.6" fill="var(--fg)"/></svg>`;
+}
+
+function render(){
+  const has=weeks.length>0;
+  $('summary').hidden=!has;$('bfSec').hidden=!has;$('ledgerSec').hidden=!has;$('histSec').hidden=!has;
+  if(!has){$('status').hidden=false;$('status').textContent='No weeks logged yet. Add your first measurements below.';return}
+  $('status').hidden=true;
+  const L=weeks[weeks.length-1],P=weeks[weeks.length-2]||null,F4=weeks[Math.max(0,weeks.length-5)];
+  const four=weeks.length>1?F4:null;
+  $('latestLabel').textContent='Latest · '+fmtDate(L.date)+(P?' · vs '+fmtDate(P.date):'');
+  const head=[['bf','Body fat','%',-1],['waist','Waist','cm',-1],['weight','Weight','kg',-1]];
+  $('bfChart').innerHTML=bfChart(weeks);
+  const lb=num(L.bf);
+  $('bfNote').textContent=lb==null?'':(lb<=TARGET_BF?'At or below your 15% goal.':(Math.round((lb-TARGET_BF)*10)/10)+' points to go to 15%.')+' Estimated from waist, neck and height (US Navy method). Expect a few points of error either way; the trend matters more than the number.';
+  $('headline').innerHTML=head.map(([k,n,u,g])=>{
+    const v=num(L[k]),d=P?delta(v,num(P[k])):null;
+    return `<div class="stat"><div class="eyebrow">${n}</div><b>${fmt(v)}<span style="font-size:.8rem;color:var(--muted)"> ${u}</span></b><small class="${dCls(d,g)}">${P?dTxt(d)+' this week':'baseline'}</small></div>`}).join('');
+  const recent=weeks.slice(-8);
+  $('ledger').innerHTML=SITES.map(s=>{
+    const v=num(L[s.k]);
+    const d1=P?delta(v,num(P[s.k])):null, d4=four?delta(v,num(four[s.k])):null;
+    return `<tr><td class="site">${s.name}${s.side?`<span>${s.side}</span>`:''}</td><td class="n">${fmt(v)}</td><td class="n ${dCls(d1,s.goal)}">${dTxt(d1)}</td><td class="n ${dCls(d4,s.goal)}">${dTxt(d4)}</td><td>${spark(recent.map(w=>num(w[s.k])))}</td></tr>`}).join('');
+  $('hist').innerHTML=weeks.slice().reverse().map(w=>`<li><div><div style="font-weight:600">${fmtDate(w.date)}</div><div class="meta">Waist ${fmt(num(w.waist))} · ${w.weight!=null?fmt(num(w.weight))+' kg':'no weight'}</div></div><button type="button" data-edit="${w.date}">Edit</button></li>`).join('');
+  if(!editing)prefill();
+}
+
+function prefill(){
+  $('f-date').value=today();
+  const L=weeks[weeks.length-1];
+  KEYS.forEach(k=>{const el=$('f-'+k);el.value='';el.placeholder=L&&num(L[k])!=null?fmt(num(L[k])):''});
+}
+
+function loadForEdit(date){
+  const w=weeks.find(x=>x.date===date);if(!w)return;
+  editing=date;confirmDel=false;
+  $('formTitle').textContent='Edit '+fmtDate(date);
+  $('f-date').value=date;
+  KEYS.forEach(k=>{$('f-'+k).value=num(w[k])!=null?w[k]:''});
+  $('cancelBtn').hidden=false;$('delBtn').hidden=false;$('delBtn').textContent='Delete this week';
+  $('saveBtn').textContent='Save changes';$('msg').textContent='';
+  $('form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function resetForm(){
+  editing=null;confirmDel=false;
+  $('formTitle').textContent='Log this week';$('saveBtn').textContent='Save week';
+  $('cancelBtn').hidden=true;$('delBtn').hidden=true;prefill();
+}
+
+$('hist').addEventListener('click',e=>{const b=e.target.closest('[data-edit]');if(b)loadForEdit(b.dataset.edit)});
+$('cancelBtn').addEventListener('click',()=>{resetForm();$('msg').textContent=''});
+
+$('form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const date=$('f-date').value;
+  if(!date){$('msg').textContent='Pick a date for this entry.';return}
+  const body={date};let count=0,bad=null;
+  for(const k of KEYS){
+    const raw=$('f-'+k).value.trim().replace(',','.');
+    if(raw===''){continue}
+    const v=parseFloat(raw);
+    if(!isFinite(v)||v<=0||v>300){bad=k;break}
+    body[k]=v;count++;
+  }
+  if(bad){$('msg').textContent='Check the '+bad.replace(/[LR]$/,'')+' value: it should be a number in cm (or kg for weight).';return}
+  if(!count){$('msg').textContent='Enter at least one measurement.';return}
+    $('saveBtn').disabled=true;$('msg').textContent='Saving…';
+  try{
+    if(editing&&editing!==date)await db.collection('weeks').doc(editing).delete();
+    await db.collection('weeks').doc(date).set(body);
+    $('msg').textContent='Saved '+fmtDate(date)+'.';resetForm();
+  }catch(err){$('msg').textContent=err&&err.code==='invalid_argument'?'Only the page owner can save measurements here.':'Couldn’t save. Check your connection and try again.'}
+  $('saveBtn').disabled=false;
+});
+
+$('delBtn').addEventListener('click',async()=>{
+  if(!editing)return;
+  if(!confirmDel){confirmDel=true;$('delBtn').textContent='Tap again to delete';return}
+  try{await db.collection('weeks').doc(editing).delete();$('msg').textContent='Deleted '+fmtDate(editing)+'.';resetForm()}
+  catch(err){$('msg').textContent='Couldn’t delete. Try again.'}
+});
+
+const STORE='tapeLog.weeks.v1';
+function loadWeeks(){try{return JSON.parse(localStorage.getItem(STORE)||'[]')}catch(e){return []}}
+function saveWeeks(list){localStorage.setItem(STORE,JSON.stringify(list))}
+function refresh(){weeks=loadWeeks().filter(w=>w&&w.date).sort((a,b)=>a.date<b.date?-1:1).map(enrich);render()}
+db={collection:()=>({doc:id=>({
+  set:async body=>{const l=loadWeeks().filter(w=>w.date!==id);l.push(body);saveWeeks(l);refresh()},
+  delete:async()=>{saveWeeks(loadWeeks().filter(w=>w.date!==id));refresh()}})})};
+/* One-time import: open the app with #import=<base64 JSON array of weeks> */
+(function(){const m=location.hash.match(/^#import=(.+)$/);if(!m)return;
+  try{const inc=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));
+    if(Array.isArray(inc)){const byDate={};loadWeeks().concat(inc).forEach(w=>{if(w&&w.date)byDate[w.date]=w});saveWeeks(Object.values(byDate));
+      $('msg').textContent='Imported '+inc.length+' week'+(inc.length===1?'':'s')+'.'}}catch(e){$('msg').textContent='That import link didn\u2019t work.'}
+  history.replaceState(null,'',location.pathname+location.search)})();
+$('backupBtn').addEventListener('click',async()=>{
+  const link=location.origin+location.pathname+'#import='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(loadWeeks())))));
+  try{await navigator.clipboard.writeText(link);$('backupMsg').textContent='Backup link copied. Keep it somewhere safe; opening it restores your weeks.'}
+  catch(e){$('backupMsg').textContent=link}
+});
+prefill();refresh();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+
+</body></html>
